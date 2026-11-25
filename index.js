@@ -24,7 +24,7 @@
  * - Ordinary forks and shared content-addressed attachments are never removed.
  */
 
-import { mkdir, readdir, rename, rm, unlink } from 'node:fs/promises'
+import { mkdir, readdir, rename, rm, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 
 export const name = 'clean-archived-sessions'
@@ -41,6 +41,10 @@ const MAX_ID_LENGTH = 256
 const DEFAULT_BLANK_SCAN_MAX_BYTES = 256 * 1024
 /** Session descriptions and blankness reads in flight per listing. */
 const LIST_CONCURRENCY = 4
+/** Marker file that proves this plugin created the trash directory. */
+const TRASH_MARKER = '.dsh-clean-archived-sessions'
+/** Name of a staged Session directory: `<session directory>-<epoch ms>`. */
+const STAGED_NAME = /^.+-\d{13,}$/
 /** Projection keys read from the projection cache as zero-I/O hints. */
 const CACHED_KEYS = ['sessionListMetadata', 'turnOutline', 'title']
 
@@ -433,18 +437,29 @@ export function apply(ctx, rawConfig) {
     }
   }
 
-  /** Remove leftovers of earlier deletions whose final removal failed. */
-  async function sweepTrash(trashDir) {
-    let entries
-    try {
-      entries = await readdir(trashDir)
-    } catch (error) {
-      if (isENOENT(error)) return
-      throw error
+  /**
+   * Make sure the trash directory exists and belongs to this plugin. A new or
+   * empty directory is claimed with a marker file; an existing non-empty
+   * directory without the marker is refused, so a `trashDir` pointed at a
+   * shared folder never has its contents touched.
+   */
+  async function claimTrash(trashDir) {
+    await mkdir(trashDir, { recursive: true, mode: 0o700 })
+    const entries = await readdir(trashDir)
+    if (entries.includes(TRASH_MARKER)) return
+    if (entries.length > 0) {
+      throw new DeleteRefusal('bad-config', `trashDir '${trashDir}' is not empty and was not created by this plugin`, 500)
     }
-    for (const entry of entries) {
-      await rm(join(trashDir, entry), { recursive: true, force: true }).catch((error) => {
-        ctx.logger.warn('clean-archived-sessions: trash leftover %s not removed: %s', entry, errorText(error))
+    await writeFile(join(trashDir, TRASH_MARKER), 'Staging directory of dsh-clean-archived-sessions.\n', { flag: 'wx' })
+      .catch((error) => { if (error?.code !== 'EEXIST') throw error })
+  }
+
+  /** Remove leftovers of earlier deletions whose final removal failed; only this plugin's staged directories match. */
+  async function sweepTrash(trashDir) {
+    for (const entry of await readdir(trashDir, { withFileTypes: true })) {
+      if (!entry.isDirectory() || !STAGED_NAME.test(entry.name)) continue
+      await rm(join(trashDir, entry.name), { recursive: true, force: true }).catch((error) => {
+        ctx.logger.warn('clean-archived-sessions: trash leftover %s not removed: %s', entry.name, errorText(error))
       })
     }
   }
@@ -518,8 +533,9 @@ export function apply(ctx, rawConfig) {
     const home = dirname(sessionsRoot)
     const trashDir = config.trashDir ?? join(home, 'trash', 'clean-archived-sessions')
     const projectionCacheDir = config.projectionCacheDir ?? join(home, 'storages', 'session_projcache', 'sessions')
-    if (trashDir === sessionsRoot || trashDir.startsWith(sessionsRoot + sep)) {
-      throw new DeleteRefusal('bad-config', `trashDir '${trashDir}' must lie outside '${sessionsRoot}'`, 500)
+    // The trash directory must neither contain nor lie inside the sessions root.
+    if (trashDir === sessionsRoot || trashDir.startsWith(sessionsRoot + sep) || sessionsRoot.startsWith(trashDir + sep)) {
+      throw new DeleteRefusal('bad-config', `trashDir '${trashDir}' must not contain or lie inside '${sessionsRoot}'`, 500)
     }
 
     // Fence: lock root first, then descendants, so publishing a migrated root
@@ -540,7 +556,7 @@ export function apply(ctx, rawConfig) {
       const byId = new Map(now.map(snapshot => [snapshot.header.id, snapshot]))
       const directories = [...tree].reverse().map(id => sessionDirectoryOf(byId.get(id), sessionsRoot))
 
-      await mkdir(trashDir, { recursive: true, mode: 0o700 })
+      await claimTrash(trashDir)
       await sweepTrash(trashDir)
       staged = await stageDirectories(directories, trashDir)
     } finally {

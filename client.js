@@ -54,6 +54,7 @@ window.__ModuleLoader__.load({
         'error.not-deletable': 'Only archived sessions, empty sessions, and orphaned subagent sessions can be deleted. To delete another session, archive it first.',
         'error.unreadable': 'The session files cannot be read by this version of DeepSeek Harness, so they are not deleted.',
         'error.move-failed': 'The session files could not be moved; nothing was deleted. Retry, or check the folder permissions.',
+        'error.bad-config': 'The plugin trashDir setting is unsafe: it must be an empty or plugin-owned folder outside the sessions folder. Nothing was deleted.',
         unarchiveFailed: 'Could not unarchive the session.',
         'error.not-blank': 'This session now has messages. Archive it first if you want to delete it.',
         'error.subagent': 'Subagent sessions are deleted together with their parent session.',
@@ -119,6 +120,7 @@ window.__ModuleLoader__.load({
         'error.not-deletable': '只能删除已归档的会话、空会话和孤立的子智能体会话。要删除其他会话，请先归档。',
         'error.unreadable': '当前版本的 DeepSeek Harness 无法读取该会话文件，因此不会删除。',
         'error.move-failed': '无法移动会话文件，没有删除任何内容。请重试，或检查文件夹权限。',
+        'error.bad-config': '插件的 trashDir 配置不安全：它必须是空的或由本插件创建的文件夹，且不能包含会话目录。没有删除任何内容。',
         unarchiveFailed: '无法取消归档该会话。',
         'error.not-blank': '该会话现在已有消息。如需删除，请先归档。',
         'error.subagent': '子智能体会话会随父会话一起删除。',
@@ -141,7 +143,7 @@ window.__ModuleLoader__.load({
       },
     }
 
-    const KNOWN_ERRORS = new Set(['in-use', 'active', 'not-deletable', 'not-blank', 'subagent', 'unsupported-storage', 'forbidden', 'partial', 'unreadable', 'move-failed'])
+    const KNOWN_ERRORS = new Set(['in-use', 'active', 'not-deletable', 'not-blank', 'subagent', 'unsupported-storage', 'forbidden', 'partial', 'unreadable', 'move-failed', 'bad-config'])
     const KNOWN_WARNINGS = new Set([
       'worktree-retained', 'worktree-unknown', 'schedule-delete-failed', 'detach-failed', 'unpin-failed',
       'trash-cleanup-failed', 'cache-delete-failed', 'unarchive-failed',

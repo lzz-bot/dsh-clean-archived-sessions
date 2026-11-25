@@ -10,7 +10,7 @@ const roots = []
 after(async () => { await Promise.all(roots.map(root => rm(root, { recursive: true, force: true }))) })
 
 /** Build a temporary DSH home plus mocked services, and apply the plugin to it. */
-async function setup({ cache = {}, schedules = [] } = {}) {
+async function setup({ cache = {}, schedules = [], config = () => ({}) } = {}) {
   const home = await mkdtemp(join(tmpdir(), 'clean-archived-sessions-'))
   roots.push(home)
   const project = join(home, 'sessions', '--proj--')
@@ -81,7 +81,7 @@ async function setup({ cache = {}, schedules = [] } = {}) {
     effect: fn => fn(),
     logger: { debug() {}, info() {}, warn() {} },
   }
-  apply(ctx, {})
+  apply(ctx, config(home))
 
   async function call(path, method, body, principal = 'owner') {
     const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))]
@@ -172,7 +172,7 @@ test('deletes an archived tree after the commit point, then cleans references', 
   assert.ok(!caches.includes('archivedRoot.json') && !caches.includes('archivedChild.json'))
   assert.ok(env.calls.some(([kind, id]) => kind === 'unarchive' && id === 'archivedRoot'))
   assert.ok(env.calls.some(([kind, id]) => kind === 'emit' && id === 'api-session/removed'))
-  assert.deepEqual(await readdir(join(env.home, 'trash', 'clean-archived-sessions')), [])
+  assert.deepEqual(await readdir(join(env.home, 'trash', 'clean-archived-sessions')), ['.dsh-clean-archived-sessions'])
   // Root is locked before its descendants, and every lock is released.
   const locks = env.calls.filter(([kind, , mode]) => kind === 'open' && mode === 'write').map(([, id]) => id)
   assert.deepEqual(locks, ['archivedRoot', 'archivedChild'])
@@ -212,4 +212,32 @@ test('a failed move deletes nothing and keeps references', async () => {
   assert.ok(await env.exists('archivedChild'))
   assert.ok(!env.calls.some(([kind]) => kind === 'schedule-delete' || kind === 'unarchive'))
   assert.deepEqual(env.state.archived, ['archivedRoot', 'busy'])
+})
+
+test('never touches a shared trashDir that the plugin does not own', async () => {
+  const shared = await setup({ config: home => ({ trashDir: join(home, 'shared') }) })
+  await mkdir(join(shared.home, 'shared', 'keep-me-1700000000000'), { recursive: true })
+  await writeFile(join(shared.home, 'shared', 'notes.txt'), 'user data')
+  const res = await shared.remove('archivedRoot')
+  assert.equal(res.payload.code, 'bad-config')
+  assert.ok(await shared.exists('archivedRoot'))
+  assert.deepEqual((await readdir(join(shared.home, 'shared'))).sort(), ['keep-me-1700000000000', 'notes.txt'])
+})
+
+test('refuses a trashDir that contains the sessions root', async () => {
+  const ancestor = await setup({ config: home => ({ trashDir: home }) })
+  const res = await ancestor.remove('archivedRoot')
+  assert.equal(res.payload.code, 'bad-config')
+  assert.ok(await ancestor.exists('archivedRoot'))
+  assert.ok((await readdir(ancestor.home)).includes('sessions'))
+})
+
+test('claims an empty trashDir and sweeps only staged leftovers', async () => {
+  const trash = join(env.home, 'trash', 'clean-archived-sessions')
+  assert.equal((await env.remove('blank')).status, 200)
+  assert.ok((await readdir(trash)).includes('.dsh-clean-archived-sessions'))
+  await mkdir(join(trash, 'session-old-1700000000000'))
+  await writeFile(join(trash, 'unrelated.txt'), 'kept')
+  assert.equal((await env.remove('orphan')).status, 200)
+  assert.deepEqual((await readdir(trash)).sort(), ['.dsh-clean-archived-sessions', 'unrelated.txt'])
 })

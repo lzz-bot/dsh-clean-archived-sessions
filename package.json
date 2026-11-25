@@ -1,6 +1,6 @@
 {
   "name": "dsh-clean-archived-sessions",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Clean up archived, empty, and orphaned sessions by permanently deleting them.",
   "license": "MIT",
   "repository": {
@@ -37,6 +37,7 @@
     "locale/*.json",
     "icon.svg",
     "README.md",
+    "README.zh.md",
     "LICENSE"
   ],
   "publishConfig": {

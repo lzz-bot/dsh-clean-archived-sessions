@@ -1,0 +1,72 @@
+# dsh-clean-archived-sessions
+
+[English](README.md) | 简体中文
+
+一个 DeepSeek Harness 插件包，在设置中新增「清理归档会话」页面（Settings > Clean up archived sessions）。页面列出侧边栏无法清理的三组会话，可以逐个或按组将其从本机永久删除：
+
+- **已归档会话**：在侧边栏归档过的会话。每一行也可以取消归档。
+- **空会话**：有工作目录、但从未发送过消息的会话。侧边栏会隐藏它们，因此无法在那里归档。当前打开着的会话，以及被定时任务使用的会话不会列出。不属于任何工作区的会话会标注「未分组」。
+- **孤立的子智能体会话**：父会话已不存在的子智能体会话。
+
+其他会话，包括侧边栏「未分组」区里有内容的会话，都要先在侧边栏归档。共用同一 DSH 目录的其他 profile（CLI、ACP、SDK）也把会话存在同一个文件夹里，之后还可能继续打开它们；所以除非会话已归档、是空会话或是孤立会话，插件都不会列出。
+
+DSH 缓存中有相应信息时，每一行会显示标题、第一句提问、对话轮数、最后发消息的时间、占用空间和子智能体会话数。页面语言跟随 DeepSeek Harness 的界面语言（英文或简体中文）。
+
+## 删除会移除什么
+
+- `<DSH home>/sessions/<project>/<session>/` 下的会话目录，以及它递归创建的所有子智能体会话。
+- 投影缓存文件 `<DSH home>/storages/session_projcache/sessions/<id>.json`。
+- 指向该会话的定时任务、它的置顶、它在工作区中的记录，最后是它的归档记录。
+
+## 删除不会移除什么
+
+- 分叉会话，因为它们是独立的对话。
+- 按内容寻址的附件，其他会话可能也在使用。
+- 会话目录之外的 spill 文件。spill 存储按时间清理它们，而不是跟随会话的生命周期。
+- 会话创建的 Git worktree。只有当 worktree 服务在本次运行中报告某个已归档会话的清理"被保留"或"失败"时，插件才会提醒；其他 worktree 检测不到。
+
+## 安全性
+
+- 只有这台 DSH 的所有者可以调用插件的接口（`GET /clean-archived-sessions/list`、`POST /clean-archived-sessions/delete`）。
+- 修改任何内容之前，插件会先锁住整棵会话树里每个会话的写锁，先锁父会话再锁子会话。锁住之后会再检查一次：会话仍然是已归档、空会话或孤立会话，并且没有任务在运行。
+- 把整棵树的所有目录移到中转目录是提交点。任何一个移动失败，已移动的目录会放回原处，其他内容都不会改变。定时任务、工作区记录、置顶、缓存和归档记录，都在移动成功之后才清理。
+- DSH 没有提供释放"本次运行中打开过的会话"的接口。这类会话会显示为正在使用，重启后才能删除。
+- 当前 DSH 版本无法读取的会话文件（已损坏或格式更新）会拒绝删除，而不是删掉。
+
+## 运行要求
+
+- DeepSeek Harness `^0.2.3-alpha.2`（见 `engines.dsh`）。DSH 的插件接口尚未稳定，升级到 0.3 后需要重新确认。
+- Web 或桌面版 profile（需要 `webServer`、`workspaceRegistry`、`sessionPersistence`）。缺少这些服务时，插件不会启用。
+- 默认的 JSONL 会话存储。换用其他存储时，页面仍能列出会话，但会拒绝删除。
+
+## 安装
+
+用固定的标签从 GitHub 安装，可以在「插件 → 添加插件」里安装，也可以让智能体调用 `plugin_manager` 的 `install_bundle`：
+
+```text
+github:lzz-bot/dsh-clean-archived-sessions#v1.0.1
+```
+
+安装会固定在这个标签上；要升级，用更新的标签重新安装。也可以安装本地目录：传入它的绝对路径，或者在目录里运行 `npm pack` 后安装生成的 `.tgz`。
+
+## 版本
+
+插件在 `package.json` 里使用独立的语义化版本号，与 DeepSeek Harness 的版本无关；发布标签格式为 `v<版本号>`，从 `v1.0.0` 开始。支持的 DeepSeek Harness 版本单独写在 `engines.dsh` 中。更早的标签 `v0.2.3-alpha.2` 和 `v0.2.3-alpha.3` 是在采用这个规则之前打的。
+
+## 配置
+
+profile 的 `cordis.patch.yml` 中，`clean-archived-sessions` 这一行可以设置以下可选字段：
+
+| 字段 | 默认值 | 说明 |
+|---|---|---|
+| `trashDir` | `<DSH home>/trash/clean-archived-sessions` | 中转目录的绝对路径，既不能包含会话目录，也不能位于会话目录内。只有在它不存在或为空时，插件才会放入标记文件 `.dsh-clean-archived-sessions` 来占用它；已有内容、又不是插件创建的文件夹会被拒绝使用。会话目录先移到这里再删除；下一次删除时只清理遗留的会话文件夹（`<名称>-<毫秒时间戳>`）。中转目录与会话目录不在同一个文件系统时无法移动，会改为原地删除，这种删除不是原子的 |
+| `projectionCacheDir` | `<DSH home>/storages/session_projcache/sessions` | 投影缓存目录的绝对路径，用于改动过存储位置的 profile |
+| `blankScanMaxBytes` | `262144` | 判断是否为空会话时，最多读取多大的会话日志 |
+
+## 开发
+
+`npm test` 会用模拟的 DSH 服务运行后端测试（基于 `node --test`，无需安装依赖）。
+
+## 许可证
+
+MIT
