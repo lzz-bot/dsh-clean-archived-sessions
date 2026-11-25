@@ -21,7 +21,7 @@ A DeepSeek Harness bundle that adds **Settings > Clean up archived sessions** (è
 
 ## Safety
 
-- Only the owner of the DSH instance can call the routes (`GET /archived-sessions/list`, `POST /archived-sessions/delete`).
+- Only the owner of the DSH instance can call the routes (`GET /clean-archived-sessions/list`, `POST /clean-archived-sessions/delete`).
 - Every session in the tree is locked with the persistence write lock while its files are moved out of the sessions root and removed, so no Agent can resume it meanwhile.
 - DSH has no API to release a session that was opened during the current run. Such a session is shown as in use and can be deleted after a restart.
 - An empty session is checked again under the lock; if it received a message in the meantime, deletion is refused.
@@ -34,7 +34,13 @@ A DeepSeek Harness bundle that adds **Settings > Clean up archived sessions** (è
 
 ## Installation
 
-Install the directory with **Plugins > Add plugin**, or let an agent call `plugin_manager` `install_bundle` with the absolute directory path. To share it, copy the directory or run `npm pack` in it and install the resulting `.tgz`.
+Install from GitHub with a pinned tag, either through **Plugins > Add plugin** or by letting an agent call `plugin_manager` `install_bundle`:
+
+```text
+github:lzz-bot/dsh-clean-archived-sessions#v0.2.3-alpha.2
+```
+
+The installation stays on that tag; install the bundle again with a newer tag to upgrade. To install a local checkout instead, pass its absolute directory path, or run `npm pack` in it and install the resulting `.tgz`.
 
 ## Configuration
 
@@ -42,7 +48,7 @@ Optional fields of the `clean-archived-sessions` row in the profile `cordis.patc
 
 | Field | Default | Meaning |
 |---|---|---|
-| `trashDir` | `<DSH home>/trash/archived-sessions` | Absolute staging directory outside the sessions root; directories are moved here and then removed |
+| `trashDir` | `<DSH home>/trash/clean-archived-sessions` | Absolute staging directory outside the sessions root; directories are moved here and then removed |
 | `projectionCacheDir` | `<DSH home>/storages/session_projcache/sessions` | Absolute projection cache directory, for profiles that move the storage root |
 | `blankScanMaxBytes` | `262144` | Largest stored log that is read to check whether a session is empty |
 

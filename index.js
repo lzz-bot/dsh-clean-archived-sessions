@@ -26,8 +26,8 @@ import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 export const name = 'clean-archived-sessions'
 export const inject = ['webServer', 'workspaceRegistry', 'sessionPersistence']
 
-const LIST_PATH = '/archived-sessions/list'
-const DELETE_PATH = '/archived-sessions/delete'
+const LIST_PATH = '/clean-archived-sessions/list'
+const DELETE_PATH = '/clean-archived-sessions/delete'
 const MAX_BODY_BYTES = 4096
 const MAX_ID_LENGTH = 256
 /**
@@ -97,12 +97,12 @@ function errorText(error) {
  */
 function resolveConfig(config) {
   const value = config ?? {}
-  if (typeof value !== 'object' || Array.isArray(value)) throw new TypeError('archived-sessions: config must be an object')
+  if (typeof value !== 'object' || Array.isArray(value)) throw new TypeError('clean-archived-sessions: config must be an object')
   const out = { blankScanMaxBytes: DEFAULT_BLANK_SCAN_MAX_BYTES }
   const limit = value.blankScanMaxBytes
   if (limit !== undefined && limit !== null) {
     if (!Number.isSafeInteger(limit) || limit < 0) {
-      throw new TypeError('archived-sessions: config.blankScanMaxBytes must be a non-negative integer')
+      throw new TypeError('clean-archived-sessions: config.blankScanMaxBytes must be a non-negative integer')
     }
     out.blankScanMaxBytes = limit
   }
@@ -110,7 +110,7 @@ function resolveConfig(config) {
     const field = value[key]
     if (field === undefined || field === null) continue
     if (typeof field !== 'string' || !isAbsolute(field)) {
-      throw new TypeError(`archived-sessions: config.${key} must be an absolute path`)
+      throw new TypeError(`clean-archived-sessions: config.${key} must be an absolute path`)
     }
     out[key] = resolve(field)
   }
@@ -166,7 +166,7 @@ export function apply(ctx, rawConfig) {
       const snapshot = await query.readTitle(id)
       return typeof snapshot?.title === 'string' && snapshot.title.trim() !== '' ? snapshot.title : undefined
     } catch (error) {
-      ctx.logger.debug('archived-sessions: title of %s unavailable: %s', id, errorText(error))
+      ctx.logger.debug('clean-archived-sessions: title of %s unavailable: %s', id, errorText(error))
       return undefined
     }
   }
@@ -210,7 +210,7 @@ export function apply(ctx, rawConfig) {
       handle = await persistence.open(snapshot.header.id, 'read')
       return await handleIsBlank(handle)
     } catch (error) {
-      ctx.logger.debug('archived-sessions: blankness of %s unavailable: %s', snapshot.header.id, errorText(error))
+      ctx.logger.debug('clean-archived-sessions: blankness of %s unavailable: %s', snapshot.header.id, errorText(error))
       return false
     } finally {
       await handle?.close().catch(() => {})
@@ -320,9 +320,10 @@ export function apply(ctx, rawConfig) {
   }
 
   async function forgetInRegistry(ids, warnings) {
+    // `sessionIds` hides accounted ids whose cwd no longer validates, so detach
+    // from every Workspace; detaching an absent id writes nothing.
     for (const workspace of registry.list()) {
       for (const id of ids) {
-        if (!workspace.sessionIds.includes(id)) continue
         try {
           await workspace.detachSession(id)
         } catch (error) {
@@ -394,7 +395,7 @@ export function apply(ctx, rawConfig) {
     const rootDirectory = sessionDirectoryOf(root, undefined)
     const sessionsRoot = dirname(dirname(rootDirectory))
     const home = dirname(sessionsRoot)
-    const trashDir = config.trashDir ?? join(home, 'trash', 'archived-sessions')
+    const trashDir = config.trashDir ?? join(home, 'trash', 'clean-archived-sessions')
     const projectionCacheDir = config.projectionCacheDir ?? join(home, 'storages', 'session_projcache', 'sessions')
     if (trashDir === sessionsRoot || trashDir.startsWith(sessionsRoot + sep)) {
       throw new DeleteRefusal('bad-config', `trashDir '${trashDir}' must lie outside '${sessionsRoot}'`, 500)
@@ -448,7 +449,7 @@ export function apply(ctx, rawConfig) {
         try {
           await handle.close()
         } catch (error) {
-          ctx.logger.warn('archived-sessions: releasing %s failed: %s', handle.id, errorText(error))
+          ctx.logger.warn('clean-archived-sessions: releasing %s failed: %s', handle.id, errorText(error))
         }
       }
     }
@@ -459,7 +460,7 @@ export function apply(ctx, rawConfig) {
       await registry.unarchiveSession(id)
     }
     ctx.emit('api-session/removed', sessionId)
-    ctx.logger.info('archived-sessions: deleted session %s (%d sessions)', sessionId, tree.length)
+    ctx.logger.info('clean-archived-sessions: deleted session %s (%d sessions)', sessionId, tree.length)
     return { sessionId, deletedSessions: tree.length, removedSchedules, warnings, alreadyMissing: false }
   }
 
@@ -473,11 +474,11 @@ export function apply(ctx, rawConfig) {
       try {
         sendJson(res, 200, await listCandidates())
       } catch (error) {
-        ctx.logger.warn('archived-sessions: listing failed: %s', errorText(error))
+        ctx.logger.warn('clean-archived-sessions: listing failed: %s', errorText(error))
         sendJson(res, 500, { code: 'list-failed', message: errorText(error) })
       }
     },
-  }), `archived-sessions: GET ${LIST_PATH}`)
+  }), `clean-archived-sessions: GET ${LIST_PATH}`)
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'exact',
@@ -514,9 +515,9 @@ export function apply(ctx, rawConfig) {
         if (error instanceof DeleteRefusal) {
           return sendJson(res, error.status, { code: error.code, message: error.message })
         }
-        ctx.logger.warn('archived-sessions: deleting %s failed: %s', sessionId, errorText(error))
+        ctx.logger.warn('clean-archived-sessions: deleting %s failed: %s', sessionId, errorText(error))
         sendJson(res, 500, { code: 'delete-failed', message: errorText(error) })
       }
     },
-  }), `archived-sessions: POST ${DELETE_PATH}`)
+  }), `clean-archived-sessions: POST ${DELETE_PATH}`)
 }

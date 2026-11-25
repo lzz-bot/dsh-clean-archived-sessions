@@ -4,9 +4,9 @@ window.__ModuleLoader__.load({
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const NS = 'archivedSessions'
-    const LIST_ROUTE = 'archived-sessions/list'
-    const DELETE_ROUTE = 'archived-sessions/delete'
+    const NS = 'cleanArchivedSessions'
+    const LIST_ROUTE = 'clean-archived-sessions/list'
+    const DELETE_ROUTE = 'clean-archived-sessions/delete'
 
     const messages = {
       en: {
@@ -114,38 +114,38 @@ window.__ModuleLoader__.load({
     ])
 
     const css = `
-.dshArchived-page { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 720px; min-width: 0; color: var(--dsw-alias-label-primary); }
-.dshArchived-title { margin: 0; font-size: 16px; line-height: 24px; font-weight: 500; }
-.dshArchived-title:focus { outline: none; }
-.dshArchived-subtitle { margin: 12px 0 0; font-size: 14px; line-height: 22px; font-weight: 500; }
-.dshArchived-intro { margin: 0 0 4px; font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-tertiary); }
-.dshArchived-card { display: flex; flex-direction: column; min-width: 0; box-sizing: border-box; margin: 0; padding: 4px 16px; list-style: none; border: 0.5px solid var(--dsw-alias-settings-card-stroke); border-radius: var(--dsw-radius-xl); background: var(--dsw-alias-settings-card-fill); }
-.dshArchived-row { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; min-width: 0; }
-.dshArchived-row + .dshArchived-row { border-top: 0.5px solid var(--dsw-alias-border-l2); }
-.dshArchived-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.dshArchived-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.dshArchived-name { margin: 0; font-size: 14px; line-height: 22px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dshArchived-meta { margin: 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
-.dshArchived-path { font-family: var(--dsw-font-mono); }
-.dshArchived-caution { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px 12px; border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, transparent); border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-state-warn-tertiary); font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-primary); }
-.dshArchived-cautionIcon { flex: none; margin-top: 2px; color: var(--dsw-alias-state-warn-primary); }
-.dshArchived-cautionBody { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
-.dshArchived-cautionBody p, .dshArchived-cautionBody ul { margin: 0; }
-.dshArchived-cautionBody ul { padding-inline-start: 1.2em; }
-.dshArchived-error { margin: 0; padding: 8px 12px; border-radius: var(--dsw-radius-md); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent); font-size: 13px; line-height: 20px; color: var(--dsw-alias-state-error-primary); overflow-wrap: anywhere; }
-.dshArchived-status { margin: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
-.dshArchived-actions { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
-.dshArchived-confirm { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; border-radius: var(--dsw-radius-md); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent); }
-.dshArchived-confirmText { margin: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-state-error-primary); }
-.dshArchived-button { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 10px; border: 0.5px solid transparent; border-radius: var(--dsw-radius-sm); font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap; cursor: pointer; color: var(--dsw-alias-label-primary); background: transparent; box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l3); }
-.dshArchived-button:disabled { cursor: not-allowed; opacity: 0.4; }
-.dshArchived-button:focus-visible { outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 1px; }
-.dshArchived-danger { color: var(--dsw-alias-state-error-primary); }
-.dshArchived-dangerFilled { color: var(--dsw-alias-label-primary-foreground); background: var(--dsw-alias-state-error-primary); box-shadow: none; }
+.dshCleanArchived-page { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 720px; min-width: 0; color: var(--dsw-alias-label-primary); }
+.dshCleanArchived-title { margin: 0; font-size: 16px; line-height: 24px; font-weight: 500; }
+.dshCleanArchived-title:focus { outline: none; }
+.dshCleanArchived-subtitle { margin: 12px 0 0; font-size: 14px; line-height: 22px; font-weight: 500; }
+.dshCleanArchived-intro { margin: 0 0 4px; font-size: 14px; line-height: 22px; color: var(--dsw-alias-label-tertiary); }
+.dshCleanArchived-card { display: flex; flex-direction: column; min-width: 0; box-sizing: border-box; margin: 0; padding: 4px 16px; list-style: none; border: 0.5px solid var(--dsw-alias-settings-card-stroke); border-radius: var(--dsw-radius-xl); background: var(--dsw-alias-settings-card-fill); }
+.dshCleanArchived-row { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; min-width: 0; }
+.dshCleanArchived-row + .dshCleanArchived-row { border-top: 0.5px solid var(--dsw-alias-border-l2); }
+.dshCleanArchived-main { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.dshCleanArchived-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.dshCleanArchived-name { margin: 0; font-size: 14px; line-height: 22px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dshCleanArchived-meta { margin: 0; font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
+.dshCleanArchived-path { font-family: var(--dsw-font-mono); }
+.dshCleanArchived-caution { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px 12px; border: 0.5px solid color-mix(in srgb, var(--dsw-alias-state-warn-primary) 40%, transparent); border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-state-warn-tertiary); font-size: 12px; line-height: 18px; color: var(--dsw-alias-label-primary); }
+.dshCleanArchived-cautionIcon { flex: none; margin-top: 2px; color: var(--dsw-alias-state-warn-primary); }
+.dshCleanArchived-cautionBody { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.dshCleanArchived-cautionBody p, .dshCleanArchived-cautionBody ul { margin: 0; }
+.dshCleanArchived-cautionBody ul { padding-inline-start: 1.2em; }
+.dshCleanArchived-error { margin: 0; padding: 8px 12px; border-radius: var(--dsw-radius-md); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent); font-size: 13px; line-height: 20px; color: var(--dsw-alias-state-error-primary); overflow-wrap: anywhere; }
+.dshCleanArchived-status { margin: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-label-secondary); }
+.dshCleanArchived-actions { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
+.dshCleanArchived-confirm { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; border-radius: var(--dsw-radius-md); background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 10%, transparent); }
+.dshCleanArchived-confirmText { margin: 0; font-size: 13px; line-height: 20px; color: var(--dsw-alias-state-error-primary); }
+.dshCleanArchived-button { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; height: 28px; padding: 0 10px; border: 0.5px solid transparent; border-radius: var(--dsw-radius-sm); font: inherit; font-size: 12px; line-height: 18px; white-space: nowrap; cursor: pointer; color: var(--dsw-alias-label-primary); background: transparent; box-shadow: inset 0 0 0 0.5px var(--dsw-alias-border-l3); }
+.dshCleanArchived-button:disabled { cursor: not-allowed; opacity: 0.4; }
+.dshCleanArchived-button:focus-visible { outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, var(--dsw-alias-brand-primary)); outline-offset: 1px; }
+.dshCleanArchived-danger { color: var(--dsw-alias-state-error-primary); }
+.dshCleanArchived-dangerFilled { color: var(--dsw-alias-label-primary-foreground); background: var(--dsw-alias-state-error-primary); box-shadow: none; }
 @media (hover: hover) {
-  .dshArchived-button:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
-  .dshArchived-danger:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover-danger, var(--dsw-alias-interactive-bg-hover)); }
-  .dshArchived-dangerFilled:hover:not(:disabled) { background: var(--dsw-alias-state-error-primary); opacity: 0.88; }
+  .dshCleanArchived-button:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); }
+  .dshCleanArchived-danger:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover-danger, var(--dsw-alias-interactive-bg-hover)); }
+  .dshCleanArchived-dangerFilled:hover:not(:disabled) { background: var(--dsw-alias-state-error-primary); opacity: 0.88; }
 }
 `
 
@@ -196,7 +196,7 @@ window.__ModuleLoader__.load({
     }
 
     function WarningIcon() {
-      return h('svg', { className: 'dshArchived-cautionIcon', width: 14, height: 14, viewBox: '0 0 16 16', 'aria-hidden': true },
+      return h('svg', { className: 'dshCleanArchived-cautionIcon', width: 14, height: 14, viewBox: '0 0 16 16', 'aria-hidden': true },
         h('path', { d: 'M8 1.5 15 14H1z', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinejoin: 'round' }),
         h('path', { d: 'M8 6v4M8 11.6v.4', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round' }))
     }
@@ -206,12 +206,12 @@ window.__ModuleLoader__.load({
       const [error, setError] = React.useState(null)
       const deleteButton = React.useRef(null)
       const ids = React.useMemo(() => {
-        const base = `dshArchived-${item.sessionId.replace(/[^A-Za-z0-9_-]/g, '_')}`
+        const base = `dshCleanArchived-${item.sessionId.replace(/[^A-Za-z0-9_-]/g, '_')}`
         return { note: `${base}-note`, confirm: `${base}-confirm` }
       }, [item.sessionId])
       const busy = busyKind !== null
       const meta = []
-      if (item.cwd) meta.push(h('span', { key: 'cwd', className: 'dshArchived-path' }, item.cwd))
+      if (item.cwd) meta.push(h('span', { key: 'cwd', className: 'dshCleanArchived-path' }, item.cwd))
       if (typeof item.createdAt === 'number') meta.push(h('span', { key: 'at' }, t('created', { date: formatDate(item.createdAt) })))
       if (item.sizeBytes !== undefined) meta.push(h('span', { key: 'size' }, formatBytes(item.sizeBytes)))
       if (item.subagentCount > 0) {
@@ -234,40 +234,40 @@ window.__ModuleLoader__.load({
           setError(errorMessage(t, reason))
         }
       }
-      return h('li', { className: 'dshArchived-row', 'aria-busy': busy || undefined },
-        h('div', { className: 'dshArchived-main' },
-          h('div', { className: 'dshArchived-text' },
-            h('p', { className: 'dshArchived-name', title }, title),
-            h('p', { className: 'dshArchived-meta' }, joined)),
-          !confirming && h('div', { className: 'dshArchived-actions' },
+      return h('li', { className: 'dshCleanArchived-row', 'aria-busy': busy || undefined },
+        h('div', { className: 'dshCleanArchived-main' },
+          h('div', { className: 'dshCleanArchived-text' },
+            h('p', { className: 'dshCleanArchived-name', title }, title),
+            h('p', { className: 'dshCleanArchived-meta' }, joined)),
+          !confirming && h('div', { className: 'dshCleanArchived-actions' },
             onUnarchive !== undefined && h('button', {
-              type: 'button', className: 'dshArchived-button', disabled: busy,
+              type: 'button', className: 'dshCleanArchived-button', disabled: busy,
               onClick: () => { void run(() => onUnarchive(item.sessionId)) },
             }, busyKind === 'unarchive' ? t('unarchiving') : t('unarchive')),
             h('button', {
               ref: deleteButton,
-              type: 'button', className: 'dshArchived-button dshArchived-danger', disabled: busy || item.live,
+              type: 'button', className: 'dshCleanArchived-button dshCleanArchived-danger', disabled: busy || item.live,
               'aria-describedby': item.live ? ids.note : undefined,
               onClick: () => { setError(null); setConfirming(true) },
             }, busyKind === 'delete' ? t('deleting') : t('delete')))),
-        item.live && h('div', { className: 'dshArchived-caution', id: ids.note },
-          h(WarningIcon), h('div', { className: 'dshArchived-cautionBody' }, h('p', null, t('inUse')))),
+        item.live && h('div', { className: 'dshCleanArchived-caution', id: ids.note },
+          h(WarningIcon), h('div', { className: 'dshCleanArchived-cautionBody' }, h('p', null, t('inUse')))),
         confirming && h('div', {
-          className: 'dshArchived-confirm', role: 'group', 'aria-label': t('confirmDelete'), 'aria-describedby': ids.confirm,
+          className: 'dshCleanArchived-confirm', role: 'group', 'aria-label': t('confirmDelete'), 'aria-describedby': ids.confirm,
           onKeyDown: (event) => {
             if (event.key !== 'Escape') return
             event.stopPropagation()
             cancel()
           },
         },
-        h('p', { className: 'dshArchived-confirmText', id: ids.confirm }, t('confirm')),
-        h('div', { className: 'dshArchived-actions' },
-          h('button', { type: 'button', className: 'dshArchived-button', autoFocus: true, onClick: cancel }, t('cancel')),
+        h('p', { className: 'dshCleanArchived-confirmText', id: ids.confirm }, t('confirm')),
+        h('div', { className: 'dshCleanArchived-actions' },
+          h('button', { type: 'button', className: 'dshCleanArchived-button', autoFocus: true, onClick: cancel }, t('cancel')),
           h('button', {
-            type: 'button', className: 'dshArchived-button dshArchived-dangerFilled',
+            type: 'button', className: 'dshCleanArchived-button dshCleanArchived-dangerFilled',
             onClick: () => { setConfirming(false); void run(() => onDelete(item.sessionId, title)) },
           }, t('confirmDelete')))),
-        error !== null && h('p', { className: 'dshArchived-error', role: 'alert' }, error))
+        error !== null && h('p', { className: 'dshCleanArchived-error', role: 'alert' }, error))
     }
 
     function ArchivedSessionsPage({ t, useWorkspaces, useSessions, loadArchived, deleteSession, unarchiveSession, formatDate }) {
@@ -320,7 +320,7 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const rowsOf = (items, label, unarchive) => h('ul', { className: 'dshArchived-card', 'aria-label': label },
+      const rowsOf = (items, label, unarchive) => h('ul', { className: 'dshCleanArchived-card', 'aria-label': label },
         items.map(item => h(ArchivedRow, {
           key: item.sessionId, t, item, title: titleOf(item), formatDate,
           blank: summaries?.[item.sessionId]?.blank === true,
@@ -329,37 +329,37 @@ window.__ModuleLoader__.load({
         })))
 
       const group = (id, title, intro, items) => items.length === 0 ? null
-        : h('section', { className: 'dshArchived-page', 'aria-labelledby': id },
-          h('h3', { className: 'dshArchived-subtitle', id }, title),
-          h('p', { className: 'dshArchived-intro' }, intro),
+        : h('section', { className: 'dshCleanArchived-page', 'aria-labelledby': id },
+          h('h3', { className: 'dshCleanArchived-subtitle', id }, title),
+          h('p', { className: 'dshCleanArchived-intro' }, intro),
           rowsOf(items, title, undefined))
 
       let body
       let unlisted = null
       let blank = null
       if (state.phase === 'loading') {
-        body = h('p', { className: 'dshArchived-status', role: 'status' }, t('loading'))
+        body = h('p', { className: 'dshCleanArchived-status', role: 'status' }, t('loading'))
       } else if (state.phase === 'error') {
-        body = h('div', { className: 'dshArchived-actions', style: { justifyContent: 'flex-start' } },
-          h('p', { className: 'dshArchived-error', role: 'alert' }, t('loadFailed')),
-          h('button', { type: 'button', className: 'dshArchived-button', onClick: () => setReloadToken(value => value + 1) }, t('retry')))
+        body = h('div', { className: 'dshCleanArchived-actions', style: { justifyContent: 'flex-start' } },
+          h('p', { className: 'dshCleanArchived-error', role: 'alert' }, t('loadFailed')),
+          h('button', { type: 'button', className: 'dshCleanArchived-button', onClick: () => setReloadToken(value => value + 1) }, t('retry')))
       } else {
         body = state.items.length === 0
-          ? h('p', { className: 'dshArchived-status' }, t('empty'))
+          ? h('p', { className: 'dshCleanArchived-status' }, t('empty'))
           : rowsOf(state.items, t('title'), onUnarchive)
-        unlisted = group('dshArchived-unlisted', t('unlistedTitle'), t('unlistedIntro'), state.unlisted)
-        blank = group('dshArchived-blank', t('blankTitle'), t('blankIntro'), state.blank)
+        unlisted = group('dshCleanArchived-unlisted', t('unlistedTitle'), t('unlistedIntro'), state.unlisted)
+        blank = group('dshCleanArchived-blank', t('blankTitle'), t('blankIntro'), state.blank)
       }
-      return h('section', { className: 'dshArchived-page', 'aria-label': t('title') },
+      return h('section', { className: 'dshCleanArchived-page', 'aria-label': t('title') },
         h('style', null, css),
-        h('h2', { className: 'dshArchived-title', ref: heading, tabIndex: -1 }, t('title')),
-        h('p', { className: 'dshArchived-intro' }, t('intro')),
-        notice !== null && h('div', { className: 'dshArchived-caution', role: 'status' },
+        h('h2', { className: 'dshCleanArchived-title', ref: heading, tabIndex: -1 }, t('title')),
+        h('p', { className: 'dshCleanArchived-intro' }, t('intro')),
+        notice !== null && h('div', { className: 'dshCleanArchived-caution', role: 'status' },
           h(WarningIcon),
-          h('div', { className: 'dshArchived-cautionBody' },
+          h('div', { className: 'dshCleanArchived-cautionBody' },
             h('p', null, t('deletedWithWarnings', { title: notice.title })),
             h('ul', null, notice.warnings.map(text => h('li', { key: text }, text)))),
-          h('button', { type: 'button', className: 'dshArchived-button', onClick: () => setNotice(null) }, t('dismiss'))),
+          h('button', { type: 'button', className: 'dshCleanArchived-button', onClick: () => setNotice(null) }, t('dismiss'))),
         body,
         unlisted,
         blank)
@@ -368,7 +368,7 @@ window.__ModuleLoader__.load({
     return {
       inject: ['slots', 'locale', 'contextMenus', 'workspaces', 'sessions'],
       apply(ctx) {
-        ctx.effect(() => ctx.locale.register(NS, messages), 'archived-sessions: locale')
+        ctx.effect(() => ctx.locale.register(NS, messages), 'clean-archived-sessions: locale')
         const t = ctx.locale.bind(NS)
 
         const deleteSession = async (sessionId, title) => {
@@ -390,7 +390,7 @@ window.__ModuleLoader__.load({
 
         ctx.slots.inject('settings.section', () => ctx.slots.register({
           name: 'settings.section',
-          id: 'archived-sessions',
+          id: 'clean-archived-sessions',
           order: 25,
           label: () => t('nav'),
           locale: NS,
