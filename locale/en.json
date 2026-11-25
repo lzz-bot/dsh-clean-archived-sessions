@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Clean up archived sessions",
-    "description": "Adds Settings > Clean up archived sessions, which lists archived sessions, sessions outside every workspace (for example, left behind when a workspace was removed), and empty sessions that never received a message, and permanently deletes them from this computer. Deleting removes the conversation log, its subagent sessions, cached projections, and schedules that target it; forks and shared attachments are kept. A session opened during the current run stays loaded until DeepSeek Harness restarts and cannot be deleted before then. Deletion cannot be undone."
+    "description": "Adds Settings > Clean up archived sessions, which lists archived sessions, empty sessions that never received a message, and orphaned subagent sessions, and permanently deletes them from this computer, one at a time or a whole group at once. Deleting removes the conversation log, its subagent sessions, cached projections, and schedules that target it; forks and shared attachments are kept. To delete any other session, archive it from the sidebar first. A session opened during the current run stays loaded until DeepSeek Harness restarts and cannot be deleted before then. Deletion cannot be undone."
   }
 }

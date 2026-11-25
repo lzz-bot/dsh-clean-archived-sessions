@@ -1,7 +1,7 @@
 {
   "name": "dsh-clean-archived-sessions",
-  "version": "0.2.3-alpha.2",
-  "description": "Clean up archived, unlisted, and empty sessions by permanently deleting them.",
+  "version": "1.0.0",
+  "description": "Clean up archived, empty, and orphaned sessions by permanently deleting them.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -18,6 +18,9 @@
     "sessions"
   ],
   "type": "module",
+  "scripts": {
+    "test": "node --test test/"
+  },
   "engines": {
     "dsh": "^0.2.3-alpha.2"
   },
