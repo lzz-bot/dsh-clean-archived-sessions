@@ -24,7 +24,7 @@
  * - Ordinary forks and shared content-addressed attachments are never removed.
  */
 
-import { mkdir, readdir, rename, rm, unlink, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readdir, realpath, rename, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 
 export const name = 'clean-archived-sessions'
@@ -44,7 +44,13 @@ const LIST_CONCURRENCY = 4
 /** Marker file that proves this plugin created the trash directory. */
 const TRASH_MARKER = '.dsh-clean-archived-sessions'
 /** Name of a staged Session directory: `<session directory>-<epoch ms>`. */
-const STAGED_NAME = /^.+-\d{13,}$/
+const STAGED_NAME = /^.+-(\d{13,})$/
+/**
+ * Staged directories younger than this are left alone by the sweep: another
+ * DSH process sharing the trash directory may still be committing or rolling
+ * them back.
+ */
+const SWEEP_MIN_AGE_MS = 10 * 60 * 1000
 /** Projection keys read from the projection cache as zero-I/O hints. */
 const CACHED_KEYS = ['sessionListMetadata', 'turnOutline', 'title']
 
@@ -243,10 +249,12 @@ export function apply(ctx, rawConfig) {
    * @returns {'archived' | 'orphan' | 'blank-candidate' | undefined}
    */
   function classifyHeader(header, stored, archived, scheduled) {
-    if (archived.has(header.id)) return 'archived'
     if (header.origin === 'subagent') {
-      return header.parentSession === undefined || !stored.has(header.parentSession) ? 'orphan' : undefined
+      // A child whose parent still exists is deleted with that parent, even when archived on its own.
+      if (header.parentSession !== undefined && stored.has(header.parentSession)) return undefined
+      return archived.has(header.id) ? 'archived' : 'orphan'
     }
+    if (archived.has(header.id)) return 'archived'
     if (header.cwd === undefined || scheduled.has(header.id) || isLive(header.id)) return undefined
     return 'blank-candidate'
   }
@@ -261,7 +269,9 @@ export function apply(ctx, rawConfig) {
     const turns = Array.isArray(cached?.turnOutline) ? cached.turnOutline : undefined
     const preview = turns?.find(entry => typeof entry?.prompt === 'string' && entry.prompt.trim() !== '')?.prompt
     const lastPromptAt = cached?.sessionListMetadata?.lastPromptAt
-    const title = cached?.title?.title
+    const title = cached?.title?.title ?? cachedPredecessorTitle(snapshot.header)
+    const parent = snapshot.header.parentSession
+    const attachedChild = snapshot.header.origin === 'subagent' && parent !== undefined && byId.has(parent)
     return {
       sessionId,
       ...(typeof title === 'string' && title.trim() !== '' ? { title } : {}),
@@ -274,8 +284,19 @@ export function apply(ctx, rawConfig) {
       subagentCount: tree.length - 1,
       subagent: snapshot.header.origin === 'subagent',
       ungrouped: !members.has(sessionId),
+      ...(attachedChild ? { deleteBlocked: 'subagent' } : {}),
       live: tree.some(isLive),
       missing: false,
+    }
+  }
+
+  /** Title of an earlier Session format's cache row, a zero-I/O fallback the session list also uses. */
+  function cachedPredecessorTitle(header) {
+    try {
+      return ctx.get('sessionProjectionCache')?.cachedPredecessorTitle?.(header)?.values?.title?.title
+    } catch (error) {
+      ctx.logger.debug('clean-archived-sessions: predecessor title of %s unavailable: %s', header.id, errorText(error))
+      return undefined
     }
   }
 
@@ -438,26 +459,56 @@ export function apply(ctx, rawConfig) {
   }
 
   /**
-   * Make sure the trash directory exists and belongs to this plugin. A new or
-   * empty directory is claimed with a marker file; an existing non-empty
-   * directory without the marker is refused, so a `trashDir` pointed at a
-   * shared folder never has its contents touched.
+   * Make sure the trash directory exists, belongs to this plugin, and can take
+   * a rename from the sessions root. Paths are compared after resolving
+   * symbolic links. On POSIX the directory must be owned by this user and not
+   * writable by others, because session logs pass through it. A new or empty
+   * directory is claimed with a regular marker file; a non-empty directory
+   * without one is refused, so a shared folder never has its contents touched.
+   * @returns {Promise<string>} the resolved trash directory.
    */
-  async function claimTrash(trashDir) {
+  async function claimTrash(trashDir, sessionsRoot) {
     await mkdir(trashDir, { recursive: true, mode: 0o700 })
-    const entries = await readdir(trashDir)
-    if (entries.includes(TRASH_MARKER)) return
-    if (entries.length > 0) {
-      throw new DeleteRefusal('bad-config', `trashDir '${trashDir}' is not empty and was not created by this plugin`, 500)
+    const [realTrash, realSessions] = await Promise.all([realpath(trashDir), realpath(sessionsRoot)])
+    const contains = (outer, inner) => inner === outer || inner.startsWith(outer + sep)
+    if (contains(realTrash, realSessions) || contains(realSessions, realTrash)) {
+      throw new DeleteRefusal('bad-config', `trashDir '${realTrash}' must not contain or lie inside '${realSessions}'`, 500)
     }
-    await writeFile(join(trashDir, TRASH_MARKER), 'Staging directory of dsh-clean-archived-sessions.\n', { flag: 'wx' })
-      .catch((error) => { if (error?.code !== 'EEXIST') throw error })
+    const [trashStat, sessionsStat] = await Promise.all([stat(realTrash), stat(realSessions)])
+    if (trashStat.dev !== sessionsStat.dev) {
+      throw new DeleteRefusal('cross-device', `trashDir '${realTrash}' is not on the filesystem of '${realSessions}'`, 500)
+    }
+    const uid = typeof process.getuid === 'function' ? process.getuid() : undefined
+    if (process.platform !== 'win32' && uid !== undefined) {
+      if (trashStat.uid !== uid || (trashStat.mode & 0o022) !== 0) {
+        throw new DeleteRefusal('bad-config', `trashDir '${realTrash}' must be owned by this user and not writable by others`, 500)
+      }
+    }
+    const marker = join(realTrash, TRASH_MARKER)
+    try {
+      const markerStat = await lstat(marker)
+      if (!markerStat.isFile() || (uid !== undefined && process.platform !== 'win32' && markerStat.uid !== uid)) {
+        throw new DeleteRefusal('bad-config', `'${marker}' is not this plugin's marker file`, 500)
+      }
+      return realTrash
+    } catch (error) {
+      if (!isENOENT(error)) throw error
+    }
+    if ((await readdir(realTrash)).length > 0) {
+      throw new DeleteRefusal('bad-config', `trashDir '${realTrash}' is not empty and was not created by this plugin`, 500)
+    }
+    await writeFile(marker, 'Staging directory of dsh-clean-archived-sessions.\n', { flag: 'wx', mode: 0o600 })
+    return realTrash
   }
 
-  /** Remove leftovers of earlier deletions whose final removal failed; only this plugin's staged directories match. */
+  /**
+   * Remove leftovers of earlier deletions whose final removal failed. Only
+   * this plugin's staged directories older than {@link SWEEP_MIN_AGE_MS} match.
+   */
   async function sweepTrash(trashDir) {
     for (const entry of await readdir(trashDir, { withFileTypes: true })) {
-      if (!entry.isDirectory() || !STAGED_NAME.test(entry.name)) continue
+      const stamp = STAGED_NAME.exec(entry.name)?.[1]
+      if (!entry.isDirectory() || stamp === undefined || Date.now() - Number(stamp) < SWEEP_MIN_AGE_MS) continue
       await rm(join(trashDir, entry.name), { recursive: true, force: true }).catch((error) => {
         ctx.logger.warn('clean-archived-sessions: trash leftover %s not removed: %s', entry.name, errorText(error))
       })
@@ -466,8 +517,8 @@ export function apply(ctx, rawConfig) {
 
   /**
    * Commit point: move every directory into the trash directory, or none.
-   * A trash directory on another filesystem cannot take a rename; the tree is
-   * then removed in place, which can stop partway.
+   * When a move fails the already moved directories are moved back; if that
+   * also fails the result is reported as partial with the staged paths.
    * @returns {Promise<string[]>} staged paths to remove afterwards.
    */
   async function stageDirectories(directories, trashDir) {
@@ -479,30 +530,20 @@ export function apply(ctx, rawConfig) {
         await rename(directory, target)
         moved.push([directory, target])
       } catch (error) {
-        if (error?.code === 'EXDEV' && moved.length === 0) return removeInPlace(directories)
+        const stranded = []
         for (const [original, staged] of moved.reverse()) {
           await rename(staged, original).catch((rollback) => {
+            stranded.push(staged)
             ctx.logger.warn('clean-archived-sessions: restoring %s failed: %s', original, errorText(rollback))
           })
+        }
+        if (stranded.length > 0) {
+          throw new DeleteRefusal('partial', `moving '${directory}' failed and ${stranded.length} moved directories could not be restored: ${stranded.join(', ')}`, 500)
         }
         throw new DeleteRefusal('move-failed', `moving '${directory}' failed: ${errorText(error)}`, 500)
       }
     }
     return moved.map(([, staged]) => staged)
-  }
-
-  async function removeInPlace(directories) {
-    let removed = 0
-    for (const directory of directories) {
-      try {
-        await rm(directory, { recursive: true, force: true })
-      } catch (error) {
-        if (removed === 0) throw new DeleteRefusal('move-failed', `removing '${directory}' failed: ${errorText(error)}`, 500)
-        throw new DeleteRefusal('partial', `removed ${removed} of ${directories.length} sessions, then failed: ${errorText(error)}`, 500)
-      }
-      removed += 1
-    }
-    return []
   }
 
   /**
@@ -531,12 +572,9 @@ export function apply(ctx, rawConfig) {
     const rootDirectory = sessionDirectoryOf(byIdBefore.get(sessionId), undefined)
     const sessionsRoot = dirname(dirname(rootDirectory))
     const home = dirname(sessionsRoot)
-    const trashDir = config.trashDir ?? join(home, 'trash', 'clean-archived-sessions')
     const projectionCacheDir = config.projectionCacheDir ?? join(home, 'storages', 'session_projcache', 'sessions')
-    // The trash directory must neither contain nor lie inside the sessions root.
-    if (trashDir === sessionsRoot || trashDir.startsWith(sessionsRoot + sep) || sessionsRoot.startsWith(trashDir + sep)) {
-      throw new DeleteRefusal('bad-config', `trashDir '${trashDir}' must not contain or lie inside '${sessionsRoot}'`, 500)
-    }
+    // Validate the trash directory before taking any lock.
+    const trashDir = await claimTrash(config.trashDir ?? join(home, 'trash', 'clean-archived-sessions'), sessionsRoot)
 
     // Fence: lock root first, then descendants, so publishing a migrated root
     // generation happens before its children change.
@@ -556,7 +594,6 @@ export function apply(ctx, rawConfig) {
       const byId = new Map(now.map(snapshot => [snapshot.header.id, snapshot]))
       const directories = [...tree].reverse().map(id => sessionDirectoryOf(byId.get(id), sessionsRoot))
 
-      await claimTrash(trashDir)
       await sweepTrash(trashDir)
       staged = await stageDirectories(directories, trashDir)
     } finally {

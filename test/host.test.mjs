@@ -1,6 +1,6 @@
 // Host-half behavior tests with mocked DSH services: `node --test test/`.
 import assert from 'node:assert/strict'
-import { access, mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import { access, chmod, mkdir, mkdtemp, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, beforeEach, test } from 'node:test'
@@ -236,8 +236,58 @@ test('claims an empty trashDir and sweeps only staged leftovers', async () => {
   const trash = join(env.home, 'trash', 'clean-archived-sessions')
   assert.equal((await env.remove('blank')).status, 200)
   assert.ok((await readdir(trash)).includes('.dsh-clean-archived-sessions'))
+  const recent = `session-recent-${Date.now()}`
   await mkdir(join(trash, 'session-old-1700000000000'))
+  await mkdir(join(trash, recent))
   await writeFile(join(trash, 'unrelated.txt'), 'kept')
   assert.equal((await env.remove('orphan')).status, 200)
-  assert.deepEqual((await readdir(trash)).sort(), ['.dsh-clean-archived-sessions', 'unrelated.txt'])
+  // Old leftovers go; a directory another process may still be handling stays.
+  assert.deepEqual((await readdir(trash)).sort(), ['.dsh-clean-archived-sessions', recent, 'unrelated.txt'].sort())
+})
+
+test('an archived subagent child whose parent exists is listed but never deleted alone', async () => {
+  env.state.archived = [...env.state.archived, 'archivedChild']
+  const { payload } = await env.call('/clean-archived-sessions/list', 'GET')
+  const child = payload.items.find(item => item.sessionId === 'archivedChild')
+  assert.equal(child.deleteBlocked, 'subagent')
+  assert.ok(!payload.orphans.some(item => item.sessionId === 'archivedChild'))
+  assert.equal((await env.remove('archivedChild')).payload.code, 'subagent')
+  assert.ok(await env.exists('archivedChild'))
+  assert.ok(await env.exists('archivedRoot'))
+})
+
+test('refuses a trashDir that resolves into the sessions root through a symbolic link', async () => {
+  const linked = await setup({ config: home => ({ trashDir: join(home, 'link') }) })
+  const inside = join(linked.home, 'sessions', 'inside')
+  await mkdir(inside, { recursive: true })
+  await symlink(inside, join(linked.home, 'link'))
+  assert.equal((await linked.remove('archivedRoot')).payload.code, 'bad-config')
+  assert.ok(await linked.exists('archivedRoot'))
+  assert.deepEqual(await readdir(inside), [])
+})
+
+test('refuses a marker that is not a regular file', async () => {
+  const forged = await setup({ config: home => ({ trashDir: join(home, 'forged') }) })
+  await mkdir(join(forged.home, 'forged', '.dsh-clean-archived-sessions'), { recursive: true })
+  assert.equal((await forged.remove('archivedRoot')).payload.code, 'bad-config')
+  assert.ok(await forged.exists('archivedRoot'))
+})
+
+test('refuses a trashDir that other users can write', { skip: process.platform === 'win32' }, async () => {
+  const shared = await setup({ config: home => ({ trashDir: join(home, 'open') }) })
+  await mkdir(join(shared.home, 'open'))
+  await chmod(join(shared.home, 'open'), 0o777)
+  assert.equal((await shared.remove('archivedRoot')).payload.code, 'bad-config')
+  assert.ok(await shared.exists('archivedRoot'))
+})
+
+test('moves already staged directories back when a later move fails', async () => {
+  // The root directory vanished, so its move fails after the child was moved.
+  await rm(join(env.home, 'sessions', '--proj--', 'archivedRoot'), { recursive: true })
+  const res = await env.remove('archivedRoot')
+  assert.equal(res.payload.code, 'move-failed')
+  assert.ok(await env.exists('archivedChild'))
+  assert.deepEqual(await readdir(join(env.home, 'trash', 'clean-archived-sessions')), ['.dsh-clean-archived-sessions'])
+  assert.ok(!env.calls.some(([kind]) => kind === 'schedule-delete' || kind === 'unarchive'))
+  assert.deepEqual(env.state.archived, ['archivedRoot', 'busy'])
 })

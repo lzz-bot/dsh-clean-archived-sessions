@@ -4,13 +4,13 @@ English | [简体中文](README.zh.md)
 
 A DeepSeek Harness bundle that adds **Settings > Clean up archived sessions** (设置 > 清理归档会话). The page lists three groups of sessions that the sidebar cannot clean up and permanently deletes them from this computer, one at a time or a whole group at once:
 
-- **Archived sessions**: sessions archived from the sidebar. Each row can also be unarchived.
+- **Archived sessions**: sessions archived from the sidebar. Each row can also be unarchived. An archived subagent session whose parent still exists is listed but cannot be deleted on its own; it is deleted together with its parent.
 - **Empty sessions**: sessions with a working directory that never received a message. The sidebar hides them, so they cannot be archived there. Sessions that are open now or targeted by a scheduled task are not listed. A session outside every workspace is marked **Ungrouped**.
 - **Orphaned subagent sessions**: subagent sessions whose parent session no longer exists.
 
 Any other session, including a non-empty session in the sidebar's **Ungrouped** section, must be archived from the sidebar first. Other profiles that share the DSH home (CLI, ACP, SDK) store their sessions in the same folder and may resume them, so the plugin never offers them unless they are archived, empty, or orphaned.
 
-Each row shows the cached title, first prompt, number of turns, last message time, size, and subagent count when DSH has them cached. The page follows the DeepSeek Harness interface language (English or Simplified Chinese).
+Each row shows the cached title, first prompt, number of turns, last message time, size, and subagent count when DSH has them cached. The page follows the DeepSeek Harness interface language (English or Simplified Chinese) and reloads the lists when sessions are added or removed elsewhere.
 
 ## What deletion removes
 
@@ -29,7 +29,8 @@ Each row shows the cached title, first prompt, number of turns, last message tim
 
 - Only the owner of the DSH instance can call the routes (`GET /clean-archived-sessions/list`, `POST /clean-archived-sessions/delete`).
 - Every session in the tree is locked with the persistence write lock, root first, before anything changes. Under the locks the plugin checks again that the session is still archived, empty, or orphaned, and that no work is running.
-- Moving all directories of the tree into the trash directory is the commit point. If any move fails, the moved directories are put back and nothing else changes. Schedules, workspace membership, pins, caches, and the archive entry are cleaned only after the move.
+- Moving all directories of the tree into the trash directory is the commit point. If any move fails, the moved directories are put back and nothing else changes; if putting them back also fails, the deletion is reported as partial with the paths left in the trash directory. Schedules, workspace membership, pins, caches, and the archive entry are cleaned only after the move.
+- The trash directory is checked before any lock is taken: after resolving symbolic links it must neither contain nor lie inside the sessions root, it must be on the same filesystem, and on macOS and Linux it must be owned by the current user and not writable by others.
 - DSH has no API to release a session that was opened during the current run. Such a session is shown as in use and can be deleted after a restart.
 - A session whose files this DSH version cannot read (corrupt or from a newer format) is refused instead of deleted.
 
@@ -44,7 +45,7 @@ Each row shows the cached title, first prompt, number of turns, last message tim
 Install from GitHub with a pinned tag, either through **Plugins > Add plugin** or by letting an agent call `plugin_manager` `install_bundle`:
 
 ```text
-github:lzz-bot/dsh-clean-archived-sessions#v1.0.1
+github:lzz-bot/dsh-clean-archived-sessions#v1.0.2
 ```
 
 The installation stays on that tag; install the bundle again with a newer tag to upgrade. To install a local checkout instead, pass its absolute directory path, or run `npm pack` in it and install the resulting `.tgz`.
@@ -59,7 +60,7 @@ Optional fields of the `clean-archived-sessions` row in the profile `cordis.patc
 
 | Field | Default | Meaning |
 |---|---|---|
-| `trashDir` | `<DSH home>/trash/clean-archived-sessions` | Absolute staging directory that neither contains nor lies inside the sessions root. The plugin claims it with a `.dsh-clean-archived-sessions` marker file only while it is new or empty, and refuses to use a non-empty folder it did not create. Directories are moved here and then removed; the next deletion removes only leftover staged directories (`<name>-<epoch ms>`). On another filesystem the move is impossible and directories are removed in place, which is not atomic |
+| `trashDir` | `<DSH home>/trash/clean-archived-sessions` | Absolute staging directory on the same filesystem as the sessions root that, after resolving symbolic links, neither contains nor lies inside it. On macOS and Linux it must be owned by the current user and not writable by others. The plugin claims it with a regular `.dsh-clean-archived-sessions` marker file only while it is new or empty, and refuses a non-empty folder it did not create. Directories are moved here and then removed; later deletions remove only leftover staged directories (`<name>-<epoch ms>`) older than 10 minutes |
 | `projectionCacheDir` | `<DSH home>/storages/session_projcache/sessions` | Absolute projection cache directory, for profiles that move the storage root |
 | `blankScanMaxBytes` | `262144` | Largest stored log that is read to check whether a session is empty |
 

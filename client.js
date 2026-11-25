@@ -7,6 +7,8 @@ window.__ModuleLoader__.load({
     const NS = 'cleanArchivedSessions'
     const LIST_ROUTE = 'clean-archived-sessions/list'
     const DELETE_ROUTE = 'clean-archived-sessions/delete'
+    /** Delay before a changed session count refetches the lists. */
+    const REFRESH_DEBOUNCE_MS = 1000
 
     const messages = {
       en: {
@@ -55,7 +57,8 @@ window.__ModuleLoader__.load({
         'error.unreadable': 'The session files cannot be read by this version of DeepSeek Harness, so they are not deleted.',
         'error.move-failed': 'The session files could not be moved; nothing was deleted. Retry, or check the folder permissions.',
         'error.bad-config': 'The plugin trashDir setting is unsafe: it must be an empty or plugin-owned folder outside the sessions folder. Nothing was deleted.',
-        unarchiveFailed: 'Could not unarchive the session.',
+        'error.cross-device': 'The plugin trashDir setting is on a different disk from the sessions folder, so the deletion cannot be undone if it fails partway. Set trashDir to a folder on the same disk. Nothing was deleted.',
+        subagentNote: 'This subagent session is deleted together with its parent session. You can unarchive it here.',
         'error.not-blank': 'This session now has messages. Archive it first if you want to delete it.',
         'error.subagent': 'Subagent sessions are deleted together with their parent session.',
         'error.unsupported-storage': 'This session storage is not supported for deletion.',
@@ -67,11 +70,11 @@ window.__ModuleLoader__.load({
         lastPrompt: 'Last message {date}',
         deleteAll: 'Delete all ({count})',
         confirmAll: 'Permanently delete all {count} sessions in this group? This cannot be undone.',
-        confirmAllSkipped: 'Permanently delete {count} sessions in this group? {skipped} in use will be skipped. This cannot be undone.',
+        confirmAllSkipped: 'Permanently delete {count} sessions in this group? {skipped} that cannot be deleted now will be skipped. This cannot be undone.',
         bulkProgress: 'Deleting {done} of {total}…',
         bulkDone: 'Deleted {count} sessions.',
         bulkSummary: 'Deleted {deleted} of {total} sessions. Details:',
-        bulkSkipped: '{count} sessions in use were skipped. Restart DeepSeek Harness to delete them.',
+        bulkSkipped: '{count} sessions were skipped: they are in use (restart DeepSeek Harness first) or are deleted together with their parent session.',
         bulkFailed: '{title}: {message}',
         loadForbidden: 'Only the owner of this DeepSeek Harness can view this page.',
       },
@@ -121,7 +124,8 @@ window.__ModuleLoader__.load({
         'error.unreadable': '当前版本的 DeepSeek Harness 无法读取该会话文件，因此不会删除。',
         'error.move-failed': '无法移动会话文件，没有删除任何内容。请重试，或检查文件夹权限。',
         'error.bad-config': '插件的 trashDir 配置不安全：它必须是空的或由本插件创建的文件夹，且不能包含会话目录。没有删除任何内容。',
-        unarchiveFailed: '无法取消归档该会话。',
+        'error.cross-device': '插件的 trashDir 与会话目录不在同一个磁盘上，删除中途失败时无法还原。请把 trashDir 设到同一个磁盘上的文件夹。没有删除任何内容。',
+        subagentNote: '这个子智能体会话会随父会话一起删除；可以在这里取消归档。',
         'error.not-blank': '该会话现在已有消息。如需删除，请先归档。',
         'error.subagent': '子智能体会话会随父会话一起删除。',
         'error.unsupported-storage': '当前的会话存储方式不支持删除。',
@@ -133,17 +137,17 @@ window.__ModuleLoader__.load({
         lastPrompt: '最后发消息于 {date}',
         deleteAll: '全部删除（{count}）',
         confirmAll: '永久删除这一组的全部 {count} 个会话？此操作无法撤销。',
-        confirmAllSkipped: '永久删除这一组的 {count} 个会话？正在使用的 {skipped} 个会跳过。此操作无法撤销。',
+        confirmAllSkipped: '永久删除这一组的 {count} 个会话？其中 {skipped} 个暂时不能删除，会跳过。此操作无法撤销。',
         bulkProgress: '正在删除 {done}/{total}…',
         bulkDone: '已删除 {count} 个会话。',
         bulkSummary: '已删除 {deleted}/{total} 个会话。详情：',
-        bulkSkipped: '{count} 个正在使用的会话已跳过，重启 DeepSeek Harness 后可删除。',
+        bulkSkipped: '已跳过 {count} 个会话：它们正在使用（需先重启 DeepSeek Harness），或会随父会话一起删除。',
         bulkFailed: '{title}：{message}',
         loadForbidden: '只有这台 DeepSeek Harness 的所有者可以查看此页面。',
       },
     }
 
-    const KNOWN_ERRORS = new Set(['in-use', 'active', 'not-deletable', 'not-blank', 'subagent', 'unsupported-storage', 'forbidden', 'partial', 'unreadable', 'move-failed', 'bad-config'])
+    const KNOWN_ERRORS = new Set(['in-use', 'active', 'not-deletable', 'not-blank', 'subagent', 'unsupported-storage', 'forbidden', 'partial', 'unreadable', 'move-failed', 'bad-config', 'cross-device'])
     const KNOWN_WARNINGS = new Set([
       'worktree-retained', 'worktree-unknown', 'schedule-delete-failed', 'detach-failed', 'unpin-failed',
       'trash-cleanup-failed', 'cache-delete-failed', 'unarchive-failed',
@@ -249,6 +253,7 @@ window.__ModuleLoader__.load({
         return { note: `${base}-note`, confirm: `${base}-confirm` }
       }, [item.sessionId])
       const busy = busyKind !== null || locked
+      const blocked = item.deleteBlocked !== undefined
       const meta = []
       if (item.cwd) meta.push(h('span', { key: 'cwd', className: 'dshCleanArchived-path' }, item.cwd))
       if (typeof item.createdAt === 'number') meta.push(h('span', { key: 'at' }, t('created', { date: formatDate(item.createdAt) })))
@@ -293,12 +298,12 @@ window.__ModuleLoader__.load({
             }, busyKind === 'unarchive' ? t('unarchiving') : t('unarchive')),
             h('button', {
               ref: deleteButton,
-              type: 'button', className: 'dshCleanArchived-button dshCleanArchived-danger', disabled: busy || item.live,
-              'aria-describedby': item.live ? ids.note : undefined,
+              type: 'button', className: 'dshCleanArchived-button dshCleanArchived-danger', disabled: busy || item.live || blocked,
+              'aria-describedby': item.live || blocked ? ids.note : undefined,
               onClick: () => { setError(null); setConfirming(true) },
             }, busyKind === 'delete' ? t('deleting') : t('delete')))),
-        item.live && h('div', { className: 'dshCleanArchived-caution', id: ids.note },
-          h(WarningIcon), h('div', { className: 'dshCleanArchived-cautionBody' }, h('p', null, t('inUse')))),
+        (item.live || blocked) && h('div', { className: 'dshCleanArchived-caution', id: ids.note },
+          h(WarningIcon), h('div', { className: 'dshCleanArchived-cautionBody' }, h('p', null, t(blocked ? 'subagentNote' : 'inUse')))),
         confirming && h('div', {
           className: 'dshCleanArchived-confirm', role: 'group', 'aria-label': t('confirmDelete'), 'aria-describedby': ids.confirm,
           onKeyDown: (event) => {
@@ -317,10 +322,13 @@ window.__ModuleLoader__.load({
         error !== null && h('p', { className: 'dshCleanArchived-error', role: 'alert' }, error))
     }
 
+    /** Whether a row can be deleted now: not loaded in this run and not a child deleted with its parent. */
+    const canDelete = item => !item.live && item.deleteBlocked === undefined
+
     /** Group heading with a guarded "Delete all" action. */
     function GroupHeader({ t, id, level, title, items, bulk, disabled, onDeleteAll }) {
       const [confirming, setConfirming] = React.useState(false)
-      const deletable = items.filter(item => !item.live)
+      const deletable = items.filter(canDelete)
       const skipped = items.length - deletable.length
       const running = bulk !== null && bulk.group === id
       const heading = h(level, { className: level === 'h2' ? 'dshCleanArchived-title' : 'dshCleanArchived-subtitle', id, tabIndex: -1 }, title)
@@ -360,7 +368,15 @@ window.__ModuleLoader__.load({
       const [notice, setNotice] = React.useState(null)
       const [reloadToken, setReloadToken] = React.useState(0)
       const heading = React.useRef(null)
-      const key = archivedIds.join('\n')
+      // Sessions created or removed elsewhere change the empty and orphan groups;
+      // refetch once the session count settles instead of on every change.
+      const sessionCount = useSessions(state => state.ids.length)
+      const [settledCount, setSettledCount] = React.useState(sessionCount)
+      React.useEffect(() => {
+        const timer = setTimeout(() => setSettledCount(sessionCount), REFRESH_DEBOUNCE_MS)
+        return () => clearTimeout(timer)
+      }, [sessionCount])
+      const key = `${archivedIds.join('\n')}#${settledCount}`
 
       React.useEffect(() => {
         const controller = new AbortController()
@@ -400,7 +416,7 @@ window.__ModuleLoader__.load({
         }
       }
       const onDeleteAll = async (group, items) => {
-        const targets = items.filter(item => !item.live)
+        const targets = items.filter(canDelete)
         const skipped = items.length - targets.length
         const lines = []
         let deleted = 0
@@ -498,13 +514,7 @@ window.__ModuleLoader__.load({
 
         const refreshSessions = () => ctx.sessions.refresh().catch(() => {})
         const notify = text => ctx.contextMenus.notify(text, true)
-        const unarchiveSession = async (sessionId) => {
-          // The Workspace service reports failures as a result value instead of throwing.
-          const result = await ctx.workspaces.unarchiveSession(sessionId)
-          if (result?.ok === false) {
-            throw new RouteError(result.error?.code ?? 'unarchive-failed', result.error?.message ?? t('unarchiveFailed'))
-          }
-        }
+        const unarchiveSession = sessionId => ctx.workspaces.unarchiveSession(sessionId)
         const formatDate = (ms) => {
           try {
             return new Date(ms).toLocaleString(ctx.locale.getLocale().active)
