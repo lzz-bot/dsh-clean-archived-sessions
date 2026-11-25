@@ -1,0 +1,3 @@
+- insert:
+    - id: clean-archived-sessions
+      name: 'dsh-clean-archived-sessions'

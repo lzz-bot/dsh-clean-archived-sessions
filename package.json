@@ -1,0 +1,54 @@
+{
+  "name": "dsh-clean-archived-sessions",
+  "version": "0.2.3-alpha.2",
+  "description": "Clean up archived, unlisted, and empty sessions by permanently deleting them.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lzz-bot/dsh-clean-archived-sessions.git"
+  },
+  "homepage": "https://github.com/lzz-bot/dsh-clean-archived-sessions",
+  "bugs": {
+    "url": "https://github.com/lzz-bot/dsh-clean-archived-sessions/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "sessions"
+  ],
+  "type": "module",
+  "engines": {
+    "dsh": "^0.2.3-alpha.2"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-context-menu"
+      ]
+    }
+  }
+}
